@@ -4,6 +4,7 @@ const USE_LOCAL = false;
 const REMOTE_API_BASE = "https://backend-u12d.onrender.com";
 const API_BASE = USE_LOCAL ? "http://localhost:3000" : REMOTE_API_BASE;
 
+
 function cleanName(name) {
   name = (name || "").replace(/\s+/g, " ").trim();
 
@@ -124,7 +125,7 @@ function extractInstructorName(container) {
 function buildRatingText(data) {
   if (data && data.rating !== null && data.rating !== undefined) {
     const count = data.reviewCount ?? data.numRatings ?? 0;
-    return `RMP: ${data.rating}/5 (${count})`;
+    return `RMP: ${data.rating} ⭐ (${count})`;
   }
   return "RMP: N/A";
 }
@@ -289,6 +290,131 @@ function addOrUpdateLabel(container, text, data = null) {
   let label;
   let button;
 
+  function ensureMuiTooltip() {
+    let popper = document.getElementById("my-extension-mui-tooltip-popper");
+    if (popper) return popper;
+
+    popper = document.createElement("div");
+    popper.id = "my-extension-mui-tooltip-popper";
+    popper.setAttribute("role", "tooltip");
+    popper.className = "cx-MuiTooltip-popper";
+
+    Object.assign(popper.style, {
+      position: "fixed",
+      top: "0px",
+      left: "0px",
+      transform: "translate3d(0px, 0px, 0px)",
+      willChange: "transform",
+      zIndex: "100000",
+      pointerEvents: "none",
+      visibility: "hidden"
+    });
+
+    const tooltip = document.createElement("div");
+    tooltip.className =
+      "cx-MuiTooltip-tooltip cx-MuiTooltip-tooltipPlacementBottom";
+
+    Object.assign(tooltip.style, {
+        opacity: "0",
+        transform: "scale(0.75)",
+        transition:
+            "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 133ms cubic-bezier(0.4, 0, 0.2, 1)",
+        background: "#000",
+        color: "#fff",
+        borderRadius: "4px",
+        padding: "6px 12px",
+        fontSize: "0.875rem",
+        fontWeight: "600",
+        lineHeight: "1.4",
+        boxSizing: "border-box",
+        maxWidth: "300px",
+        wordBreak: "break-word",
+        boxShadow: "0px 3px 8px rgba(0,0,0,0.2)"
+    });
+
+    const textNode = document.createElement("p");
+    textNode.className = "cx-MuiTypography-root text-white cx-MuiTypography-body1";
+
+    Object.assign(textNode.style, {
+        margin: "0",
+        color: "#fff",
+        fontSize: "0.875rem",
+        whiteSpace: "nowrap",
+        fontWeight: "500",
+        lineHeight: "1.4"
+    });
+
+    tooltip.appendChild(textNode);
+    popper.appendChild(tooltip);
+    document.body.appendChild(popper);
+
+    return popper;
+  }
+
+  function showMuiTooltip(target, message) {
+  if (!message) return;
+
+  const popper = ensureMuiTooltip();
+  const tooltip = popper.firstElementChild;
+  const textNode = tooltip.firstElementChild;
+
+  if (tooltipHideTimeout) {
+    clearTimeout(tooltipHideTimeout);
+    tooltipHideTimeout = null;
+  }
+
+  textNode.textContent = message;
+
+  const anchor = target.querySelector(".my-extension-label-text") || target;
+  const rect = anchor.getBoundingClientRect();
+  const top = rect.bottom + 4;
+  const centerX = rect.left + rect.width / 2;
+
+  popper.style.visibility = "visible";
+  popper.style.display = "block";
+  popper.style.left = `${centerX}px`;
+  popper.style.top = `${top}px`;
+  popper.style.transform = "translateX(-50%)";
+  popper.setAttribute("x-placement", "bottom");
+
+  // Reset to hidden state so animation can replay every time
+  tooltip.style.transition = "none";
+  tooltip.style.opacity = "0";
+  tooltip.style.transform = "scale(0.75)";
+
+  // Force reflow
+  void tooltip.offsetHeight;
+
+  // Re-enable transition and animate in
+  tooltip.style.transition =
+    "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 133ms cubic-bezier(0.4, 0, 0.2, 1)";
+
+  requestAnimationFrame(() => {
+    tooltip.style.opacity = "1";
+    tooltip.style.transform = "scale(1)";
+  });
+}
+    let tooltipHideTimeout = null;
+    function hideMuiTooltip() {
+    const popper = document.getElementById("my-extension-mui-tooltip-popper");
+    if (!popper) return;
+
+    const tooltip = popper.firstElementChild;
+
+    if (tooltipHideTimeout) {
+        clearTimeout(tooltipHideTimeout);
+    }
+
+    tooltip.style.opacity = "0";
+    tooltip.style.transform = "scale(0.75)";
+
+    tooltipHideTimeout = setTimeout(() => {
+        popper.style.visibility = "hidden";
+        popper.style.display = "none";
+        tooltipHideTimeout = null;
+    }, 200);
+    }
+
   if (!wrapper) {
     container.style.position = "relative";
 
@@ -308,30 +434,79 @@ function addOrUpdateLabel(container, text, data = null) {
 
     label = document.createElement("span");
     label.className = "my-extension-label";
-
+    label.style.setProperty("cursor", "pointer", "important");
     Object.assign(label.style, {
       color: "#1a73e8",
       fontSize: "14px",
       fontWeight: "500",
       cursor: "pointer",
-      textDecoration: "underline"
+      textDecoration: "none",
+      padding: "2px 4px",
+      borderRadius: "4px",
+      transition: "background 0.2s ease"
     });
+
+    label.onmouseenter = () => {
+        tooltipShowTimeout = setTimeout(() => {
+            showMuiTooltip(label, "Open Rate My Professors");
+        }, 150); // delay in ms (150–250 feels good)
+    };
+
+    label.onmouseleave = () => {
+        if (tooltipShowTimeout) {
+            clearTimeout(tooltipShowTimeout);
+            tooltipShowTimeout = null;
+        }
+        hideMuiTooltip();
+    };
 
     button = document.createElement("button");
     button.className = "my-extension-summary-btn";
     button.type = "button";
-    button.textContent = "AI Summary";
+    button.textContent = "Summary";
+    button.style.setProperty("cursor", "pointer", "important");
 
     Object.assign(button.style, {
       background: "#f5f7fb",
-      color: "#1f3b64",
+      color: "#000000",
       border: "1px solid #c7d3e3",
       borderRadius: "999px",
       padding: "4px 10px",
       fontSize: "12px",
       fontWeight: "600",
-      cursor: "pointer"
+      cursor: "pointer",
+      transition: "all 0.2s ease"
     });
+
+    button.onmouseenter = () => {
+    // keep your hover styles
+        button.style.backgroundColor = "#ffffff";
+        button.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+        button.style.transform = "translateY(-1px)";
+        button.style.borderColor = "#007aff";
+        button.style.setProperty("cursor", "pointer", "important");
+
+        // delay showing tooltip
+        tooltipShowTimeout = setTimeout(() => {
+            showMuiTooltip(button, "View AI summary");
+        }, 150); // tweak 100–200ms to taste
+    };
+
+    button.onmouseleave = () => {
+    // reset styles
+        button.style.backgroundColor = "#f5f7fb";
+        button.style.boxShadow = "none";
+        button.style.transform = "translateY(0)";
+        button.style.borderColor = "#c7d3e3";
+
+        // cancel pending show if you left quickly
+        if (tooltipShowTimeout) {
+            clearTimeout(tooltipShowTimeout);
+            tooltipShowTimeout = null;
+        }
+
+        hideMuiTooltip();
+    };
 
     wrapper.appendChild(label);
     wrapper.appendChild(button);
@@ -339,14 +514,12 @@ function addOrUpdateLabel(container, text, data = null) {
     const checkbox = container.querySelector('input[type="checkbox"]');
 
     if (checkbox) {
-      // Find the checkbox wrapper/block, not just the checkbox itself
       const checkboxBlock =
         checkbox.closest('[role="cell"]') ||
         checkbox.closest('.cx-MuiGrid-item') ||
         checkbox.parentElement;
 
       if (checkboxBlock && checkboxBlock.parentElement) {
-        // Insert wrapper OUTSIDE the checkbox block
         checkboxBlock.parentElement.insertBefore(wrapper, checkboxBlock);
       } else {
         container.appendChild(wrapper);
@@ -359,29 +532,30 @@ function addOrUpdateLabel(container, text, data = null) {
     button = wrapper.querySelector(".my-extension-summary-btn");
   }
 
-  label.textContent = text;
-    label.onclick = null;
-    label.title = "";
+    label.innerHTML = `
+    <span class="my-extension-label-text">${text}</span>
+    <span class="my-extension-label-arrow" style="font-size: 11px; opacity: 0.6; margin-left: 2px;">↗</span>
+    `;
+  label.onclick = null;
+  label.title = "";
+  button.title = "";
 
-    // Extract numeric rating
-    const ratingMatch = text.match(/[\d.]+/);
-    const rating = ratingMatch ? parseFloat(ratingMatch[0]) : null;
+  const ratingMatch = text.match(/[\d.]+/);
+  const rating = ratingMatch ? parseFloat(ratingMatch[0]) : null;
 
-    if (rating !== null && !isNaN(rating)) {
+  if (rating !== null && !isNaN(rating)) {
     if (rating > 4.0) {
-        label.style.color = "#2e7d32"; // green
+      label.style.color = "#2e7d32";
     } else if (rating > 3.0) {
-        label.style.color = "#f9a825"; // yellow
+      label.style.color = "#f9a825";
     } else {
-        label.style.color = "#c62828"; // red
+      label.style.color = "#c62828";
     }
-    } else {
-    // Handles "N/A", empty, or invalid values
+  } else {
     label.style.color = "#1a73e8";
-    }
+  }
 
   if (data?.url) {
-    label.title = "Open Rate My Professors";
     label.onclick = () => {
       window.open(data.url, "_blank");
     };
