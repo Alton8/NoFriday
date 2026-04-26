@@ -1,6 +1,6 @@
 const { lookupProfessorRatings, fetchProfessorReviewBundle } = require("../services/rmpService");
-const { summarizeProfessorReviews } = require("../services/groqService");
-const { extractWordFrequency } = require("../services/groqService");
+const { summarizeProfessorReviews } = require("../services/geminiService");
+const { extractWordFrequency } = require("../services/geminiService");
 
 // Short-lived bundle cache so summary + wordcloud don't both hit RMP
 const bundleCache = new Map();
