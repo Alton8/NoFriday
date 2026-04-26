@@ -53,8 +53,6 @@ const SUMMARY_SCHEMA = {
     overview:          { type: "string" },
     teachingStyle:     { type: "string" },
     workloadAndGrading:{ type: "string" },
-    studentTips:       { type: "string" },
-    bestFit:           { type: "string" },
     pros:              { type: "array", items: { type: "string" } },
     cons:              { type: "array", items: { type: "string" } },
     confidenceNote:    { type: "string" }
