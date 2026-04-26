@@ -20,21 +20,49 @@ function cleanName(name) {
 }
 
 function getSectionNodes() {
-  return Array.from(document.querySelectorAll('[role="row"], tr, .cx-MuiTableRow-root'))
+  const all = Array.from(document.querySelectorAll("*"));
+
+  return all
     .filter((el) => {
-      const text = (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+      const text = (el.innerText || el.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+
       return /\d{2}-(LEC|LAB)\*?/.test(text);
+    })
+    .filter((el) => {
+      return !Array.from(el.children).some((child) => {
+        const childText = (child.innerText || child.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        return /\d{2}-(LEC|LAB)\*?/.test(childText);
+      });
     });
 }
 
 function findSectionContainer(sectionNode) {
-  const row =
-    sectionNode.closest('[role="row"]') ||
-    sectionNode.closest("tr") ||
-    sectionNode.closest(".cx-MuiTableRow-root") ||
-    sectionNode.closest(".cx-MuiGrid-root");
+  let el = sectionNode;
 
-  if (row) return row;
+  while (el && el !== document.body) {
+    const text = (el.innerText || el.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const hasSection = /\d{2}-(LEC|LAB)\*?/.test(text);
+    const hasUsefulContent =
+      text.includes("Instructor:") ||
+      text.includes("View Details") ||
+      text.includes("Rm") ||
+      text.includes("pm") ||
+      text.includes("am");
+
+    if (hasSection && hasUsefulContent) {
+      return el;
+    }
+
+    el = el.parentElement;
+  }
 
   return sectionNode.parentElement;
 }
@@ -103,11 +131,11 @@ function buildRatingText(data) {
 }
 
 function ensureSummaryModal() {
-  let overlay = document.getElementById("classview-summary-overlay");
+  let overlay = document.getElementById("broncosort-summary-overlay");
   if (overlay) return overlay;
 
   overlay = document.createElement("div");
-  overlay.id = "classview-summary-overlay";
+  overlay.id = "broncosort-summary-overlay";
 
   Object.assign(overlay.style, {
     position: "fixed",
@@ -120,51 +148,24 @@ function ensureSummaryModal() {
   });
 
   overlay.innerHTML = `
-    <div class="classview-summary-modal" role="dialog" aria-modal="true" aria-label="Professor summary"
-      style="
-        width:min(760px, 92vw);
-        max-height:85vh;
-        overflow:auto;
-        background:#fff;
-        border-radius:16px;
-        box-shadow:0 20px 60px rgba(0,0,0,0.25);
-        padding:20px;
-        font-family:Arial, sans-serif;
-      ">
-      <div class="classview-summary-header"
-        style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px;">
+    <div class="broncosort-summary-modal" role="dialog" aria-modal="true" aria-label="Professor summary"
+      style="width:min(760px,92vw);max-height:85vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:20px;font-family:Arial,sans-serif;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px;">
         <div>
-          <div class="classview-summary-title" style="font-size:22px; font-weight:700; color:#1f3b64;">Overview</div>
-          <div id="classview-summary-subtitle" class="classview-summary-subtitle"
-            style="font-size:14px; color:#5b6b7f; margin-top:4px;"></div>
+          <div style="font-size:22px;font-weight:700;color:#1f3b64;">Overview</div>
+          <div id="broncosort-summary-subtitle" style="font-size:14px;color:#5b6b7f;margin-top:4px;"></div>
         </div>
-        <button id="classview-summary-close" type="button"
-          style="
-            border:none;
-            background:transparent;
-            font-size:28px;
-            line-height:1;
-            cursor:pointer;
-            color:#5b6b7f;
-          ">×</button>
+        <button id="broncosort-summary-close" type="button"
+          style="border:none;background:transparent;font-size:28px;line-height:1;cursor:pointer;color:#5b6b7f;">×</button>
       </div>
-
-      <div id="classview-tab-bar"
-        style="display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid #e3e8ef; padding-bottom:0;">
-        <button id="classview-tab-summary" type="button"
-          style="
-            background:none; border:none; padding:8px 16px; font-size:14px; font-weight:600;
-            cursor:pointer; color:#1f3b64; border-bottom:2px solid #1f3b64; margin-bottom:-2px;
-          ">Summary</button>
-        <button id="classview-tab-wordcloud" type="button"
-          style="
-            background:none; border:none; padding:8px 16px; font-size:14px; font-weight:600;
-            cursor:pointer; color:#5b6b7f; border-bottom:2px solid transparent; margin-bottom:-2px;
-          ">Word Cloud ☁️</button>
+      <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #e3e8ef;">
+        <button id="broncosort-tab-summary" type="button"
+          style="background:none;border:none;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;color:#1f3b64;border-bottom:2px solid #1f3b64;margin-bottom:-2px;">Summary</button>
+        <button id="broncosort-tab-wordcloud" type="button"
+          style="background:none;border:none;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;color:#5b6b7f;border-bottom:2px solid transparent;margin-bottom:-2px;">Word Cloud ☁️</button>
       </div>
-
-      <div id="classview-summary-body" class="classview-summary-body"></div>
-      <div id="classview-wordcloud-body" style="display:none;"></div>
+      <div id="broncosort-summary-body"></div>
+      <div id="broncosort-wordcloud-body" style="display:none;"></div>
     </div>
   `;
 
@@ -173,33 +174,8 @@ function ensureSummaryModal() {
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.style.display = "none";
   });
-
-  overlay.querySelector("#classview-summary-close").addEventListener("click", () => {
+  overlay.querySelector("#broncosort-summary-close").addEventListener("click", () => {
     overlay.style.display = "none";
-  });
-
-  // Tab switching
-  const tabSummary = overlay.querySelector("#classview-tab-summary");
-  const tabWordCloud = overlay.querySelector("#classview-tab-wordcloud");
-  const summaryBody = overlay.querySelector("#classview-summary-body");
-  const wordcloudBody = overlay.querySelector("#classview-wordcloud-body");
-
-  tabSummary.addEventListener("click", () => {
-    summaryBody.style.display = "";
-    wordcloudBody.style.display = "none";
-    tabSummary.style.color = "#1f3b64";
-    tabSummary.style.borderBottomColor = "#1f3b64";
-    tabWordCloud.style.color = "#5b6b7f";
-    tabWordCloud.style.borderBottomColor = "transparent";
-  });
-
-  tabWordCloud.addEventListener("click", () => {
-    summaryBody.style.display = "none";
-    wordcloudBody.style.display = "";
-    tabWordCloud.style.color = "#1f3b64";
-    tabWordCloud.style.borderBottomColor = "#1f3b64";
-    tabSummary.style.color = "#5b6b7f";
-    tabSummary.style.borderBottomColor = "transparent";
   });
 
   return overlay;
@@ -224,7 +200,7 @@ function sectionHtml(title, value) {
     : `<p style="margin:8px 0 0 0; line-height:1.5;">${value || "Not enough review data"}</p>`;
 
   return `
-    <section class="classview-summary-section"
+    <section class="broncosort-summary-section"
       style="margin-bottom:16px; padding:14px; border:1px solid #e3e8ef; border-radius:12px; background:#fafcff;">
       <h4 style="margin:0; font-size:15px; color:#1f3b64;">${title}</h4>
       ${content}
@@ -246,99 +222,106 @@ function renderSummaryBody(summary) {
 
 function renderWordCloud(words, container) {
   if (!words || words.length === 0) {
-    container.innerHTML = `<p style="color:#5b6b7f; text-align:center; padding:40px 0;">No word data available.</p>`;
+    container.innerHTML = "<p style='color:#5b6b7f;text-align:center;padding:40px 0;'>No word data available.</p>";
     return;
   }
-
   const maxCount = words[0].count;
   const minCount = words[words.length - 1].count;
-  const minSize = 13;
-  const maxSize = 42;
-
+  const minSize = 13, maxSize = 42;
   const colorMap = {
-    positive: ["#2e7d32", "#388e3c", "#43a047", "#1b5e20"],
-    negative: ["#c62828", "#d32f2f", "#e53935", "#b71c1c"],
-    neutral:  ["#1565c0", "#1976d2", "#0277bd", "#283593", "#4527a0", "#6a1b9a"]
+    positive: ["#2e7d32","#388e3c","#43a047","#1b5e20"],
+    negative: ["#c62828","#d32f2f","#e53935","#b71c1c"],
+    neutral:  ["#1565c0","#1976d2","#0277bd","#283593","#4527a0","#6a1b9a"]
   };
-
-  // Shuffle so same-sized words aren't clumped
   const shuffled = [...words].sort(() => Math.random() - 0.5);
-
   const cloudDiv = document.createElement("div");
   Object.assign(cloudDiv.style, {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px 14px",
-    padding: "24px 16px",
-    lineHeight: "1"
+    display:"flex",flexWrap:"wrap",alignItems:"center",
+    justifyContent:"center",gap:"10px 14px",padding:"24px 16px",lineHeight:"1"
   });
-
   for (const { word, count, sentiment } of shuffled) {
     const range = maxCount === minCount ? 1 : maxCount - minCount;
     const size = minSize + ((count - minCount) / range) * (maxSize - minSize);
-
     const palette = colorMap[sentiment] || colorMap.neutral;
     const color = palette[Math.floor(Math.random() * palette.length)];
-
     const span = document.createElement("span");
     span.textContent = word;
-    Object.assign(span.style, {
-      fontSize: `${size.toFixed(1)}px`,
-      fontWeight: size > 28 ? "700" : size > 18 ? "600" : "500",
-      color,
-      cursor: "default",
-      transition: "transform 0.15s ease, opacity 0.15s ease",
-      display: "inline-block",
-      opacity: "0.88"
-    });
-
     span.title = `"${word}" — mentioned ${count} time${count !== 1 ? "s" : ""}`;
-
-    span.onmouseenter = () => {
-      span.style.transform = "scale(1.18)";
-      span.style.opacity = "1";
-    };
-    span.onmouseleave = () => {
-      span.style.transform = "scale(1)";
-      span.style.opacity = "0.88";
-    };
-
+    Object.assign(span.style, {
+      fontSize:`${size.toFixed(1)}px`,
+      fontWeight:size > 28 ? "700" : size > 18 ? "600" : "500",
+      color,cursor:"default",display:"inline-block",opacity:"0.88",
+      transition:"transform 0.15s ease,opacity 0.15s ease"
+    });
+    span.onmouseenter = () => { span.style.transform = "scale(1.18)"; span.style.opacity = "1"; };
+    span.onmouseleave = () => { span.style.transform = "scale(1)"; span.style.opacity = "0.88"; };
     cloudDiv.appendChild(span);
   }
-
-  // Legend
   const legend = document.createElement("div");
-  Object.assign(legend.style, {
-    display: "flex",
-    gap: "18px",
-    justifyContent: "center",
-    marginTop: "20px",
-    fontSize: "12px",
-    color: "#5b6b7f"
-  });
+  Object.assign(legend.style, {display:"flex",gap:"18px",justifyContent:"center",marginTop:"20px",fontSize:"12px",color:"#5b6b7f"});
   legend.innerHTML = `
-    <span><span style="color:#2e7d32; font-weight:700;">■</span> Positive</span>
-    <span><span style="color:#c62828; font-weight:700;">■</span> Negative</span>
-    <span><span style="color:#1565c0; font-weight:700;">■</span> Neutral</span>
-    <span style="margin-left:8px; opacity:0.7;">Hover a word to see count · Size = frequency</span>
+    <span><span style="color:#2e7d32;font-weight:700;">■</span> Positive</span>
+    <span><span style="color:#c62828;font-weight:700;">■</span> Negative</span>
+    <span><span style="color:#1565c0;font-weight:700;">■</span> Neutral</span>
+    <span style="margin-left:8px;opacity:0.7;">Hover a word · Size = frequency</span>
   `;
-
   container.innerHTML = "";
   container.appendChild(cloudDiv);
   container.appendChild(legend);
 }
 
-async function openSummaryModal(professorName, ratingInfo = null) {
-  const overlay = ensureSummaryModal();
-  const subtitle = overlay.querySelector("#classview-summary-subtitle");
-  const body = overlay.querySelector("#classview-summary-body");
-  const wordcloudBody = overlay.querySelector("#classview-wordcloud-body");
-  const tabSummary = overlay.querySelector("#classview-tab-summary");
-  const tabWordCloud = overlay.querySelector("#classview-tab-wordcloud");
+function loadSummary(professorName, body) {
+  body.innerHTML = "<p style='margin:0;color:#5b6b7f;'>Loading summary...</p>";
+  fetch(`${API_BASE}/api/professor/summary`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ school: "Cal Poly Pomona", professor: professorName })
+  })
+  .then(res => res.ok ? res.json() : Promise.reject(res.status))
+  .then(data => {
+    const summary = data.summary || fallbackSummary("Summary missing from response.");
+    const overview = data.overview || summary.overview;
+    body.innerHTML =
+      `<section style="margin-bottom:16px;padding:14px;border:1px solid #e3e8ef;border-radius:12px;background:#fafcff;">
+        <h4 style="margin:0;font-size:15px;color:#1f3b64;">Overview</h4>
+        <p style="margin:8px 0 0 0;line-height:1.5;">${overview}</p>
+      </section>` + renderSummaryBody(summary);
+  })
+  .catch(err => {
+    const summary = fallbackSummary(`Request failed: ${err}`);
+    body.innerHTML =
+      `<section style="margin-bottom:16px;padding:14px;border:1px solid #e3e8ef;border-radius:12px;background:#fafcff;">
+        <h4 style="margin:0;font-size:15px;color:#1f3b64;">Overview</h4>
+        <p style="margin:8px 0 0 0;line-height:1.5;">${summary.overview}</p>
+      </section>` + renderSummaryBody(summary);
+  });
+}
 
-  // Always reset to Summary tab when opening
+function loadWordCloud(professorName, wordcloudBody) {
+  wordcloudBody.innerHTML = "<p style='margin:0;text-align:center;padding:40px 0;color:#5b6b7f;'>Loading word cloud...</p>";
+  fetch(`${API_BASE}/api/professor/wordcloud`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ school: "Cal Poly Pomona", professor: professorName })
+  })
+  .then(res => res.ok ? res.json() : Promise.reject(res.status))
+  .then(data => renderWordCloud(data.wordFrequency || [], wordcloudBody))
+  .catch(() => {
+    wordcloudBody.innerHTML = "<p style='color:#c62828;text-align:center;padding:40px 0;'>Failed to load word cloud.</p>";
+  });
+}
+
+function openSummaryModal(professorName, ratingInfo = null) {
+  const overlay = ensureSummaryModal();
+  const subtitle = overlay.querySelector("#broncosort-summary-subtitle");
+  const body = overlay.querySelector("#broncosort-summary-body");
+  const wordcloudBody = overlay.querySelector("#broncosort-wordcloud-body");
+  const tabSummary = overlay.querySelector("#broncosort-tab-summary");
+  const tabWordCloud = overlay.querySelector("#broncosort-tab-wordcloud");
+
+  subtitle.textContent = `${professorName}${ratingInfo?.rating ? ` • ⭐ ${ratingInfo.rating}` : ""}`;
+
+  // Reset to summary tab
   body.style.display = "";
   wordcloudBody.style.display = "none";
   tabSummary.style.color = "#1f3b64";
@@ -346,56 +329,43 @@ async function openSummaryModal(professorName, ratingInfo = null) {
   tabWordCloud.style.color = "#5b6b7f";
   tabWordCloud.style.borderBottomColor = "transparent";
 
-  subtitle.textContent = `${professorName}${ratingInfo?.rating ? ` • ⭐ ${ratingInfo.rating}` : ""}`;
-  body.innerHTML = "<p style='margin:0;'>Loading summary...</p>";
-  wordcloudBody.innerHTML = "<p style='margin:0; text-align:center; padding:40px 0; color:#5b6b7f;'>Loading word cloud...</p>";
   overlay.style.display = "flex";
 
-  try {
-    const res = await fetch(`${API_BASE}/api/professor/summary`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        school: "Cal Poly Pomona",
-        professor: professorName
-      })
-    });
-
-    if (!res.ok) {
-      const summary = fallbackSummary(`Summary request failed: ${res.status}`);
-      body.innerHTML =
-        `<section style="margin-bottom:16px; padding:14px; border:1px solid #e3e8ef; border-radius:12px; background:#fafcff;">
-          <h4 style="margin:0; font-size:15px; color:#1f3b64;">Overview</h4>
-          <p style="margin:8px 0 0 0; line-height:1.5;">${summary.overview}</p>
-        </section>` + renderSummaryBody(summary);
-      return;
-    }
-
-    const data = await res.json();
-    const summary = data.summary || fallbackSummary("Summary missing from response.");
-    const overview =
-      data.overview ||
-      summary.overview ||
-      "AI summary generated from recent available reviews.";
-
-    body.innerHTML =
-      `<section style="margin-bottom:16px; padding:14px; border:1px solid #e3e8ef; border-radius:12px; background:#fafcff;">
-        <h4 style="margin:0; font-size:15px; color:#1f3b64;">Overview</h4>
-        <p style="margin:8px 0 0 0; line-height:1.5;">${overview}</p>
-      </section>` + renderSummaryBody(summary);
-
-    // Render word cloud if backend returned frequency data
-    renderWordCloud(data.wordFrequency || [], wordcloudBody);
-  } catch (err) {
-    const summary = fallbackSummary(`Summary request failed: ${err.message}`);
-    body.innerHTML =
-      `<section style="margin-bottom:16px; padding:14px; border:1px solid #e3e8ef; border-radius:12px; background:#fafcff;">
-        <h4 style="margin:0; font-size:15px; color:#1f3b64;">Overview</h4>
-        <p style="margin:8px 0 0 0; line-height:1.5;">${summary.overview}</p>
-      </section>` + renderSummaryBody(summary);
+  // Clear loaded state if switching professors
+  if (overlay._loadedFor !== professorName) {
+    overlay._summaryLoaded = false;
+    overlay._wordcloudLoaded = false;
+    overlay._loadedFor = professorName;
   }
+
+  // Fire summary fetch immediately — no await, updates DOM when done
+  if (!overlay._summaryLoaded) {
+    overlay._summaryLoaded = true;
+    loadSummary(professorName, body);
+  }
+
+  // Tab clicks — word cloud only fetches on first click
+  tabSummary.onclick = () => {
+    body.style.display = "";
+    wordcloudBody.style.display = "none";
+    tabSummary.style.color = "#1f3b64";
+    tabSummary.style.borderBottomColor = "#1f3b64";
+    tabWordCloud.style.color = "#5b6b7f";
+    tabWordCloud.style.borderBottomColor = "transparent";
+  };
+
+  tabWordCloud.onclick = () => {
+    body.style.display = "none";
+    wordcloudBody.style.display = "";
+    tabWordCloud.style.color = "#1f3b64";
+    tabWordCloud.style.borderBottomColor = "#1f3b64";
+    tabSummary.style.color = "#5b6b7f";
+    tabSummary.style.borderBottomColor = "transparent";
+    if (!overlay._wordcloudLoaded) {
+      overlay._wordcloudLoaded = true;
+      loadWordCloud(professorName, wordcloudBody);
+    }
+  };
 }
 
 function addOrUpdateLabel(container, text, data = null) {
@@ -680,11 +650,11 @@ function addOrUpdateLabel(container, text, data = null) {
 
     const instructorName = extractInstructorName(container);
     if (!instructorName) {
-      await openSummaryModal("Unknown instructor");
+      openSummaryModal("Unknown instructor");
       return;
     }
 
-    await openSummaryModal(instructorName, data);
+    openSummaryModal(instructorName, data);
   };
 }
 
