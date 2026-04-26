@@ -6,7 +6,7 @@ const {
 const {
   summarizeProfessorReviews,
   extractWordFrequency
-} = require("../services/aiService");
+} = require("../services/groqService");
 
 // Short-lived bundle cache so summary + wordcloud don't both hit RMP
 const bundleCache = new Map();
