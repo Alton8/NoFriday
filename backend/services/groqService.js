@@ -175,8 +175,6 @@ function fallbackSummary(bundle) {
     overview: `Based on ${bundle.reviews.length} reviews, there was not enough evidence to generate a strong AI summary.`,
     teachingStyle:      "Not enough review data",
     workloadAndGrading: "Not enough review data",
-    studentTips:        "Not enough review data",
-    bestFit:            "Not enough review data",
     pros:               ["Not enough review data"],
     cons:               ["Not enough review data"],
     confidenceNote:     "Low confidence — review volume was limited or AI was unavailable."
