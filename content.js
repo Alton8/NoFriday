@@ -186,6 +186,8 @@ function fallbackSummary(message) {
     overview: message || "Summary unavailable.",
     teachingStyle: "Not enough review data",
     workloadAndGrading: "Not enough review data",
+    studentTips: "Not enough review data",
+    bestFit: "Not enough review data",
     pros: ["Not enough review data"],
     cons: ["Not enough review data"],
     confidenceNote: "Try again after verifying your backend and API keys."
@@ -210,6 +212,8 @@ function renderSummaryBody(summary) {
   return [
     sectionHtml("Teaching style", summary.teachingStyle),
     sectionHtml("Workload and grading", summary.workloadAndGrading),
+    sectionHtml("Student tips", summary.studentTips),
+    sectionHtml("Best fit", summary.bestFit),
     sectionHtml("Common pros", summary.pros || summary.commonPros),
     sectionHtml("Common cons", summary.cons || summary.commonCons),
     sectionHtml("Confidence note", summary.confidenceNote)
