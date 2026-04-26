@@ -271,10 +271,7 @@ async function filterWordFrequencyWithAI(words, reviews) {
 
 async function summarizeProfessorReviews(bundle) {
   const rawWordFrequency = extractWordFrequency(bundle.reviews);
-  const wordFrequency = await filterWordFrequencyWithAI(
-    rawWordFrequency,
-    bundle.reviews
-  );
+  const wordFrequency = rawWordFrequency;
 
   if (!bundle.reviews.length) {
     return { ...fallbackSummary(bundle), wordFrequency };
