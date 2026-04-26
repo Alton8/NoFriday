@@ -1,4 +1,4 @@
-const Groq = require("groq-sdk");
+const { GoogleGenAI } = require("@google/genai");
 
 const STOP_WORDS = new Set([
   // common english
@@ -43,6 +43,81 @@ const NEGATIVE_WORDS = new Set([
   "curved","unclear","disorganized","heavy","overwhelming","impossible","steep"
 ]);
 
+const SUMMARY_SCHEMA = {
+  type: "object",
+  properties: {
+    overview: { type: "string" },
+    teachingStyle: { type: "string" },
+    workloadAndGrading: { type: "string" },
+    studentTips: { type: "string" },
+    bestFit: { type: "string" },
+    pros: {
+      type: "array",
+      items: { type: "string" }
+    },
+    cons: {
+      type: "array",
+      items: { type: "string" }
+    },
+    confidenceNote: { type: "string" }
+  },
+  required: [
+    "overview",
+    "teachingStyle",
+    "workloadAndGrading",
+    "studentTips",
+    "bestFit",
+    "pros",
+    "cons",
+    "confidenceNote"
+  ]
+};
+
+const WORD_FILTER_SCHEMA = {
+  type: "object",
+  properties: {
+    keepWords: {
+      type: "array",
+      items: { type: "string" }
+    }
+  },
+  required: ["keepWords"]
+};
+
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+}
+
+function getModelName() {
+  return process.env.GEMINI_MODEL || "gemini-2.5-flash";
+}
+
+async function generateJson({ prompt, schema, temperature = 0 }) {
+  const ai = getGeminiClient();
+  if (!ai) {
+    throw new Error("Missing GEMINI_API_KEY");
+  }
+
+  const response = await ai.models.generateContent({
+    model: getModelName(),
+    contents: prompt,
+    config: {
+      temperature,
+      responseMimeType: "application/json",
+      responseSchema: schema
+    }
+  });
+
+  const text = response.text;
+  if (!text) {
+    throw new Error("Gemini returned an empty response");
+  }
+
+  return JSON.parse(text);
+}
+
 function extractWordFrequency(reviews) {
   const freq = {};
 
@@ -60,8 +135,8 @@ function extractWordFrequency(reviews) {
       .replace(/[^a-z\s'-]/g, "")
       .replace(/'/g, "")
       .split(/\s+/)
-      .map(w => w.replace(/^-+|-+$/g, ""))
-      .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+      .map((w) => w.replace(/^-+|-+$/g, ""))
+      .filter((w) => w.length > 3 && !STOP_WORDS.has(w));
 
     for (const w of words) {
       freq[w] = (freq[w] || 0) + 1;
@@ -86,40 +161,45 @@ function extractWordFrequency(reviews) {
 }
 
 function buildPrompt(bundle) {
-  const reviewLines = bundle.reviews.slice(0, 40).map((r, i) => {
-    return [
-      `Review ${i + 1}:`,
-      r.class ? `Course: ${r.class}` : "",
-      r.grade ? `Grade: ${r.grade}` : "",
-      r.attendance !== null ? `Attendance: ${r.attendance}` : "",
-      r.wouldTakeAgain !== null ? `Would take again: ${r.wouldTakeAgain}` : "",
-      `Text: ${r.text}`
-    ].filter(Boolean).join("\n");
-  }).join("\n\n");
+  const reviewLines = bundle.reviews
+    .slice(0, 40)
+    .map((r, i) => {
+      return [
+        `Review ${i + 1}:`,
+        r.class ? `Course: ${r.class}` : "",
+        r.grade ? `Grade: ${r.grade}` : "",
+        r.attendance !== null && r.attendance !== undefined
+          ? `Attendance: ${r.attendance}`
+          : "",
+        r.wouldTakeAgain !== null && r.wouldTakeAgain !== undefined
+          ? `Would take again: ${r.wouldTakeAgain}`
+          : "",
+        `Text: ${r.text || ""}`
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
 
   return `
 You are summarizing professor reviews for students choosing classes.
+
 Use only the provided review data and metadata.
 Do not invent claims that are not supported by the reviews.
 If evidence is weak, say so.
 Mention any grading policy found in the reviews in the overview.
+Keep the tone casual, readable, and student-friendly.
+
 Professor: ${bundle.profName}
 Overall rating: ${bundle.rating ?? "Unknown"}
 Difficulty: ${bundle.difficulty ?? "Unknown"}
 Number of ratings: ${bundle.numRatings ?? 0}
+
 Reviews:
 ${reviewLines}
-Return valid JSON with this exact shape:
-{
-  "overview": "2-3 casual sentence overview",
-  "teachingStyle": "1 short casual paragraph",
-  "workloadAndGrading": "1 short casual paragraph",
-  "studentTips": "1 short casual paragraph",
-  "bestFit": "1 short casual paragraph",
-  "pros": ["3 concise casual bullets max"],
-  "cons": ["3 concise casual bullets max"],
-  "confidenceNote": "1 casual sentence"
-}
+
+Return ONLY valid JSON matching the required schema.
+Do not wrap the JSON in markdown.
 `.trim();
 }
 
@@ -132,125 +212,111 @@ function fallbackSummary(bundle) {
     bestFit: "Not enough review data",
     pros: ["Not enough review data"],
     cons: ["Not enough review data"],
-    confidenceNote: "Low confidence because review volume was limited or the AI response was unavailable."
+    confidenceNote:
+      "Low confidence because review volume was limited or the AI response was unavailable."
   };
 }
 
-async function filterWordFrequencyWithAI(words, reviews) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || !words?.length) return words;
-
-  const groq = new Groq({ apiKey });
-
+function buildWordFilterPrompt(words, reviews) {
   const reviewSamples = reviews
     .slice(0, 10)
-    .map(r => r.text || r.comment || r.review || "")
+    .map((r) => r.text || r.comment || r.review || "")
     .filter(Boolean);
 
+  return `
+Filter a word cloud for professor reviews.
+
+Keep ONLY:
+- descriptive adjectives like clear, confusing, helpful, organized, difficult
+- meaningful academic nouns like projects, exams, labs, quizzes, grading
+
+REMOVE:
+- generic nouns like group, material, things, stuff, information
+- verbs like learn, understand, study
+- filler or vague words
+
+Goal: keep words that help a student quickly judge the professor.
+
+Candidate words:
+${JSON.stringify(words, null, 2)}
+
+Review samples:
+${JSON.stringify(reviewSamples, null, 2)}
+
+Return ONLY valid JSON matching the required schema.
+Do not wrap the JSON in markdown.
+`.trim();
+}
+
+async function filterWordFrequencyWithAI(words, reviews) {
+  if (!words?.length) return words;
+  if (!process.env.GEMINI_API_KEY) return words;
+
   try {
-    const completion = await groq.chat.completions.create({
-      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: 'system',
-          content: `Filter a word cloud for professor reviews.
-          Keep ONLY:
-          - descriptive adjectives (clear, confusing, helpful, organized, difficult)
-          - meaningful academic nouns (projects, exams, labs, quizzes, grading)
-          
-          REMOVE:
-          - generic nouns (group, material, things, stuff, information)
-          - verbs (learn, understand, study)
-          - filler or vague words
-          
-          Goal: keep words that help a student quickly judge the professor.
-          
-          Return JSON:
-          {
-            "keepWords": ["clear", "confusing", "organized", "projects", "quizzes"]
-          }`
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            candidateWords: words,
-            reviewSamples
-          })
-        }
-      ]
+    const parsed = await generateJson({
+      prompt: buildWordFilterPrompt(words, reviews),
+      schema: WORD_FILTER_SCHEMA,
+      temperature: 0
     });
 
-    const parsed = JSON.parse(completion.choices[0].message.content || "{}");
     const keepSet = new Set(parsed.keepWords || []);
-
-    return words.filter(w => keepSet.has(w.word));
+    return words.filter((w) => keepSet.has(w.word));
   } catch (err) {
-    console.error("AI filter failed:", err);
+    console.error("Gemini word filter failed:", err);
     return words;
   }
 }
 
 async function summarizeProfessorReviews(bundle) {
-  // Always compute word frequency from raw reviews regardless of AI availability
   const rawWordFrequency = extractWordFrequency(bundle.reviews);
-  const wordFrequency = await filterWordFrequencyWithAI(rawWordFrequency, bundle.reviews);
+  const wordFrequency = await filterWordFrequencyWithAI(
+    rawWordFrequency,
+    bundle.reviews
+  );
 
   if (!bundle.reviews.length) {
     return { ...fallbackSummary(bundle), wordFrequency };
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
+  if (!process.env.GEMINI_API_KEY) {
     return {
-      overview: `Found ${bundle.reviews.length} reviews, but GROQ_API_KEY is missing on the backend.`,
+      overview: `Found ${bundle.reviews.length} reviews, but GEMINI_API_KEY is missing on the backend.`,
       teachingStyle: "Not enough review data",
       workloadAndGrading: "Not enough review data",
       studentTips: "Not enough review data",
       bestFit: "Not enough review data",
       pros: ["Not enough review data"],
       cons: ["Not enough review data"],
-      confidenceNote: "Add GROQ_API_KEY to your environment variables and redeploy.",
+      confidenceNote: "Add GEMINI_API_KEY to your environment variables and redeploy.",
       wordFrequency
     };
   }
 
-  const groq = new Groq({ apiKey });
-
   try {
-    const completion = await groq.chat.completions.create({
-      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: "You summarize professor reviews into clear, student-useful insights and return only valid JSON."
-        },
-        {
-          role: "user",
-          content: buildPrompt(bundle)
-        }
-      ]
+    const parsed = await generateJson({
+      prompt: buildPrompt(bundle),
+      schema: SUMMARY_SCHEMA,
+      temperature: 0.2
     });
-
-    const raw = completion?.choices?.[0]?.message?.content || "";
-    const parsed = JSON.parse(raw);
 
     return {
       overview: parsed.overview || fallbackSummary(bundle).overview,
       teachingStyle: parsed.teachingStyle || "Not enough review data",
-      workloadAndGrading: parsed.workloadAndGrading || "Not enough review data",
+      workloadAndGrading:
+        parsed.workloadAndGrading || "Not enough review data",
       studentTips: parsed.studentTips || "Not enough review data",
       bestFit: parsed.bestFit || "Not enough review data",
-      pros: Array.isArray(parsed.pros) ? parsed.pros.slice(0, 3) : ["Not enough review data"],
-      cons: Array.isArray(parsed.cons) ? parsed.cons.slice(0, 3) : ["Not enough review data"],
+      pros: Array.isArray(parsed.pros)
+        ? parsed.pros.slice(0, 3)
+        : ["Not enough review data"],
+      cons: Array.isArray(parsed.cons)
+        ? parsed.cons.slice(0, 3)
+        : ["Not enough review data"],
       confidenceNote: parsed.confidenceNote || "Moderate confidence.",
-      wordFrequency   // <-- attached here
+      wordFrequency
     };
   } catch (error) {
-    console.error("Groq summarization error:", error);
+    console.error("Gemini summarization error:", error);
     return { ...fallbackSummary(bundle), wordFrequency };
   }
 }
