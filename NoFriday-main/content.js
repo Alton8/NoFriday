@@ -360,8 +360,25 @@ function addOrUpdateLabel(container, text, data = null) {
   }
 
   label.textContent = text;
-  label.onclick = null;
-  label.title = "";
+    label.onclick = null;
+    label.title = "";
+
+    // Extract numeric rating
+    const ratingMatch = text.match(/[\d.]+/);
+    const rating = ratingMatch ? parseFloat(ratingMatch[0]) : null;
+
+    if (rating !== null && !isNaN(rating)) {
+    if (rating > 4.0) {
+        label.style.color = "#2e7d32"; // green
+    } else if (rating > 3.0) {
+        label.style.color = "#f9a825"; // yellow
+    } else {
+        label.style.color = "#c62828"; // red
+    }
+    } else {
+    // Handles "N/A", empty, or invalid values
+    label.style.color = "#1a73e8";
+    }
 
   if (data?.url) {
     label.title = "Open Rate My Professors";
