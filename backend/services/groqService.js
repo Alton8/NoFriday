@@ -59,7 +59,7 @@ const SUMMARY_SCHEMA = {
   },
   required: [
     "overview","teachingStyle","workloadAndGrading",
-    "studentTips","bestFit","pros","cons","confidenceNote"
+    "pros","cons","confidenceNote"
   ]
 };
 
@@ -219,8 +219,6 @@ async function summarizeProfessorReviews(bundle) {
       overview:           parsed.overview           || fallbackSummary(bundle).overview,
       teachingStyle:      parsed.teachingStyle      || "Not enough review data",
       workloadAndGrading: parsed.workloadAndGrading || "Not enough review data",
-      studentTips:        parsed.studentTips        || "Not enough review data",
-      bestFit:            parsed.bestFit            || "Not enough review data",
       pros:  Array.isArray(parsed.pros) ? parsed.pros.slice(0, 3) : ["Not enough review data"],
       cons:  Array.isArray(parsed.cons) ? parsed.cons.slice(0, 3) : ["Not enough review data"],
       confidenceNote:     parsed.confidenceNote     || "Moderate confidence.",
