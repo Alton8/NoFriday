@@ -37,8 +37,6 @@ async function getProfessorSummary(req, res) {
           overview: "Professor match not found for this school.",
           teachingStyle: "Not enough review data",
           workloadAndGrading: "Not enough review data",
-          studentTips: "Not enough review data",
-          bestFit: "Not enough review data",
           pros: ["Not enough review data"],
           cons: ["Not enough review data"],
           confidenceNote: "No matching professor record was found."
@@ -67,8 +65,6 @@ async function getProfessorSummary(req, res) {
         overview: "Could not generate summary right now.",
         teachingStyle: "Not enough review data",
         workloadAndGrading: "Not enough review data",
-        studentTips: "Not enough review data",
-        bestFit: "Not enough review data",
         pros: ["Not enough review data"],
         cons: ["Not enough review data"],
         confidenceNote: "Try again after verifying your backend and API keys."
