@@ -7,7 +7,7 @@
     "https://www.ratemyprofessors.com/*"
   ],
   "icons": {
-    "128": "bronco_rmp_icon.png"
+    "128": "bronco-rmp-icon128.png"
   },
   "background": {
     "service_worker": "background.js"
